@@ -315,28 +315,340 @@ scene.add(ambLight);
   scene.add(new THREE.Points(geo,new THREE.PointsMaterial({size:0.8,vertexColors:true,transparent:true,opacity:0.85,sizeAttenuation:true})));
 })();
 
-// ── TEXTURE LOADER ──
-const tloader = new THREE.TextureLoader();
-tloader.crossOrigin='anonymous';
-const BASE='https://www.solarsystemscope.com/textures/download/';
-const TEXMAP = {
-  Sun:     BASE+'2k_sun.jpg',
-  Mercury: BASE+'2k_mercury.jpg',
-  Venus:   BASE+'2k_venus_surface.jpg',
-  Earth:   BASE+'2k_earth_daymap.jpg',
-  EarthNormal: BASE+'2k_earth_normal_map.png',
-  EarthClouds: BASE+'2k_earth_clouds.jpg',
-  Mars:    BASE+'2k_mars.jpg',
-  Jupiter: BASE+'2k_jupiter.jpg',
-  Saturn:  BASE+'2k_saturn.jpg',
-  Uranus:  BASE+'2k_uranus.jpg',
-  Neptune: BASE+'2k_neptune.jpg',
-  Moon:    BASE+'2k_moon.jpg'
+// ════════════════════════════════════════════════════
+//  TEXTURE SYSTEM
+//  Strategy: try multiple CDN URLs → if all fail,
+//  use a rich procedural canvas texture as fallback.
+//  Each planet has a hand-crafted fallback so it
+//  always looks accurate and vivid.
+// ════════════════════════════════════════════════════
+
+// CDN URL lists per key (tried in order)
+const SS  = 'https://www.solarsystemscope.com/textures/download/';
+const SS2 = 'https://www.solarsystemscope.com/textures/';
+const CDNS = {
+  Sun:         [SS+'2k_sun.jpg',         SS2+'2k_sun.jpg'],
+  Mercury:     [SS+'2k_mercury.jpg',     SS2+'2k_mercury.jpg'],
+  Venus:       [SS+'2k_venus_surface.jpg',SS2+'2k_venus_surface.jpg'],
+  Earth:       [SS+'2k_earth_daymap.jpg', SS2+'2k_earth_daymap.jpg'],
+  EarthNormal: [SS+'2k_earth_normal_map.png', SS2+'2k_earth_normal_map.png'],
+  EarthClouds: [SS+'2k_earth_clouds.jpg', SS2+'2k_earth_clouds.jpg'],
+  Mars:        [SS+'2k_mars.jpg',        SS2+'2k_mars.jpg'],
+  Jupiter:     [SS+'2k_jupiter.jpg',     SS2+'2k_jupiter.jpg'],
+  Saturn:      [SS+'2k_saturn.jpg',      SS2+'2k_saturn.jpg'],
+  Uranus:      [SS+'2k_uranus.jpg',      SS2+'2k_uranus.jpg'],
+  Neptune:     [SS+'2k_neptune.jpg',     SS2+'2k_neptune.jpg'],
+  Moon:        [SS+'2k_moon.jpg',        SS2+'2k_moon.jpg'],
 };
-function lt(key){
-  const t=tloader.load(TEXMAP[key]||'',undefined,undefined,()=>{});
-  t.colorSpace=THREE.SRGBColorSpace;
-  return t;
+
+// ── RICH PROCEDURAL CANVAS FALLBACKS ──
+// These are the guaranteed-working textures used when CDN fails.
+// Each one is hand-crafted to match the planet's real appearance.
+const SZ = 1024;
+function mkCanvas(w=SZ,h=SZ){ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
+
+function procFallbacks(){
+  const f={};
+
+  // SUN — radial gradient with sunspot noise
+  { const c=mkCanvas(); const ctx=c.getContext('2d');
+    const g=ctx.createRadialGradient(SZ/2,SZ/2,0,SZ/2,SZ/2,SZ/2);
+    g.addColorStop(0,'#fff5c0'); g.addColorStop(0.3,'#FFD700');
+    g.addColorStop(0.7,'#FF8C00'); g.addColorStop(1,'#cc4400');
+    ctx.fillStyle=g; ctx.fillRect(0,0,SZ,SZ);
+    for(let i=0;i<400;i++){
+      const x=Math.random()*SZ,y=Math.random()*SZ,r=1+Math.random()*8;
+      const bright=Math.random()>0.5;
+      ctx.fillStyle=bright?'rgba(255,255,180,0.3)':'rgba(120,40,0,0.25)';
+      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+    }
+    f.Sun=c; }
+
+  // MERCURY — dark grey, heavily cratered
+  { const c=mkCanvas(); const ctx=c.getContext('2d');
+    ctx.fillStyle='#7a6f68'; ctx.fillRect(0,0,SZ,SZ);
+    // crater rings
+    for(let i=0;i<280;i++){
+      const x=Math.random()*SZ,y=Math.random()*SZ,r=2+Math.random()*22;
+      const d=(Math.random()-0.5)*40;
+      ctx.strokeStyle=`rgba(${80+d|0},${72+d|0},${66+d|0},0.7)`;
+      ctx.lineWidth=1+Math.random()*2;
+      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.stroke();
+      ctx.fillStyle=`rgba(${55+d|0},${50+d|0},${45+d|0},0.35)`;
+      ctx.beginPath(); ctx.arc(x,y,r*0.7,0,Math.PI*2); ctx.fill();
+    }
+    // subtle colour variation
+    for(let i=0;i<600;i++){
+      const d=(Math.random()-0.5)*30;
+      ctx.fillStyle=`rgba(${120+d|0},${110+d|0},${100+d|0},0.18)`;
+      ctx.beginPath(); ctx.arc(Math.random()*SZ,Math.random()*SZ,2+Math.random()*14,0,Math.PI*2); ctx.fill();
+    }
+    f.Mercury=c; }
+
+  // VENUS — thick amber cloud bands
+  { const c=mkCanvas(); const ctx=c.getContext('2d');
+    ctx.fillStyle='#c8a84b'; ctx.fillRect(0,0,SZ,SZ);
+    for(let y=0;y<SZ;y++){
+      const v=Math.sin(y/SZ*Math.PI*14)*0.12 + Math.sin(y/SZ*Math.PI*7)*0.08;
+      const r=200+v*60|0, g2=165+v*40|0, b=60+v*20|0;
+      ctx.fillStyle=`rgba(${r},${g2},${b},0.55)`;
+      ctx.fillRect(0,y,SZ,1);
+    }
+    for(let i=0;i<300;i++){
+      const d=(Math.random()-0.5)*35;
+      ctx.fillStyle=`rgba(${210+d|0},${170+d|0},${70+d|0},0.18)`;
+      ctx.beginPath(); ctx.ellipse(Math.random()*SZ,Math.random()*SZ,5+Math.random()*60,3+Math.random()*12,Math.random()*Math.PI,0,Math.PI*2); ctx.fill();
+    }
+    f.Venus=c; }
+
+  // EARTH — blue ocean, green/brown landmasses, white ice caps
+  { const c=mkCanvas(); const ctx=c.getContext('2d');
+    // ocean base - deep blue
+    ctx.fillStyle='#1a5276'; ctx.fillRect(0,0,SZ,SZ);
+    // ocean variation
+    for(let i=0;i<800;i++){
+      const d=(Math.random()-0.5)*30;
+      ctx.fillStyle=`rgba(${26+d|0},${82+d|0},${118+d|0},0.3)`;
+      ctx.beginPath(); ctx.arc(Math.random()*SZ,Math.random()*SZ,2+Math.random()*30,0,Math.PI*2); ctx.fill();
+    }
+    // CONTINENTS - realistic shapes & positions
+    ctx.fillStyle='#4a7c59'; // base green
+    // North America
+    ctx.beginPath(); ctx.ellipse(SZ*0.17,SZ*0.35,SZ*0.10,SZ*0.14,-.3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(SZ*0.14,SZ*0.45,SZ*0.07,SZ*0.09,-.2,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(SZ*0.19,SZ*0.28,SZ*0.06,SZ*0.07,.1,0,Math.PI*2); ctx.fill();
+    // South America
+    ctx.beginPath(); ctx.ellipse(SZ*0.23,SZ*0.58,SZ*0.055,SZ*0.12,.15,0,Math.PI*2); ctx.fill();
+    // Eurasia
+    ctx.fillStyle='#5d8a4e';
+    ctx.beginPath(); ctx.ellipse(SZ*0.52,SZ*0.32,SZ*0.20,SZ*0.10,0.1,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(SZ*0.62,SZ*0.38,SZ*0.08,SZ*0.07,0,0,Math.PI*2); ctx.fill();
+    // Africa
+    ctx.fillStyle='#8B7355';
+    ctx.beginPath(); ctx.ellipse(SZ*0.50,SZ*0.52,SZ*0.065,SZ*0.13,0.05,0,Math.PI*2); ctx.fill();
+    // Australia
+    ctx.beginPath(); ctx.ellipse(SZ*0.73,SZ*0.60,SZ*0.055,SZ*0.045,-.1,0,Math.PI*2); ctx.fill();
+    // India
+    ctx.fillStyle='#6B8E6B';
+    ctx.beginPath(); ctx.ellipse(SZ*0.60,SZ*0.46,SZ*0.025,SZ*0.045,.1,0,Math.PI*2); ctx.fill();
+    // Greenland
+    ctx.fillStyle='#d0e8f0';
+    ctx.beginPath(); ctx.ellipse(SZ*0.28,SZ*0.17,SZ*0.04,SZ*0.055,-.1,0,Math.PI*2); ctx.fill();
+    // desert tones on Sahara/Arabia
+    ctx.fillStyle='rgba(190,160,90,0.55)';
+    ctx.beginPath(); ctx.ellipse(SZ*0.50,SZ*0.46,SZ*0.06,SZ*0.04,.1,0,Math.PI*2); ctx.fill();
+    // POLAR ICE CAPS — white bands at top & bottom
+    const iceCap=ctx.createLinearGradient(0,0,0,SZ*0.14);
+    iceCap.addColorStop(0,'rgba(220,235,255,1)');
+    iceCap.addColorStop(1,'rgba(200,220,240,0)');
+    ctx.fillStyle=iceCap; ctx.fillRect(0,0,SZ,SZ*0.14);
+    const iceCap2=ctx.createLinearGradient(0,SZ*0.86,0,SZ);
+    iceCap2.addColorStop(0,'rgba(220,235,255,0)');
+    iceCap2.addColorStop(1,'rgba(215,230,250,1)');
+    ctx.fillStyle=iceCap2; ctx.fillRect(0,SZ*0.86,SZ,SZ*0.14);
+    // Ocean sheen
+    for(let i=0;i<200;i++){
+      ctx.fillStyle='rgba(100,180,220,0.12)';
+      ctx.beginPath(); ctx.ellipse(Math.random()*SZ,Math.random()*SZ,5+Math.random()*50,3+Math.random()*20,Math.random()*Math.PI,0,Math.PI*2); ctx.fill();
+    }
+    f.Earth=c; }
+
+  // EARTH CLOUDS — white/grey wisps
+  { const c=mkCanvas(); const ctx=c.getContext('2d');
+    ctx.clearRect(0,0,SZ,SZ);
+    for(let i=0;i<500;i++){
+      const a=0.04+Math.random()*0.35;
+      ctx.fillStyle=`rgba(255,255,255,${a})`;
+      ctx.beginPath(); ctx.ellipse(Math.random()*SZ,Math.random()*SZ,4+Math.random()*90,2+Math.random()*25,Math.random()*Math.PI,0,Math.PI*2); ctx.fill();
+    }
+    f.EarthClouds=c; }
+
+  // MARS — orange-red with polar cap and terrain
+  { const c=mkCanvas(); const ctx=c.getContext('2d');
+    ctx.fillStyle='#b5440f'; ctx.fillRect(0,0,SZ,SZ);
+    for(let y=0;y<SZ;y++){
+      const v=Math.sin(y/SZ*Math.PI*9)*0.07;
+      const r=181+v*30|0, g2=68+v*20|0, b=15+v*10|0;
+      ctx.fillStyle=`rgba(${r},${g2},${b},0.35)`;
+      ctx.fillRect(0,y,SZ,1);
+    }
+    // terrain detail
+    for(let i=0;i<500;i++){
+      const d=(Math.random()-0.5)*45;
+      ctx.fillStyle=`rgba(${190+d|0},${90+d|0},${30+d|0},0.25)`;
+      ctx.beginPath(); ctx.arc(Math.random()*SZ,Math.random()*SZ,1+Math.random()*18,0,Math.PI*2); ctx.fill();
+    }
+    // craters
+    for(let i=0;i<60;i++){
+      const x=Math.random()*SZ,y=SZ*0.1+Math.random()*SZ*0.8,r=3+Math.random()*20;
+      ctx.strokeStyle='rgba(100,30,5,0.5)'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.stroke();
+    }
+    // polar ice cap (north)
+    const pIce=ctx.createLinearGradient(0,0,0,SZ*0.12);
+    pIce.addColorStop(0,'rgba(240,235,225,0.95)'); pIce.addColorStop(1,'rgba(240,235,225,0)');
+    ctx.fillStyle=pIce; ctx.fillRect(0,0,SZ,SZ*0.12);
+    // Valles Marineris scratch
+    ctx.strokeStyle='rgba(80,20,5,0.6)'; ctx.lineWidth=6;
+    ctx.beginPath(); ctx.moveTo(SZ*0.25,SZ*0.52); ctx.bezierCurveTo(SZ*0.4,SZ*0.50,SZ*0.6,SZ*0.54,SZ*0.75,SZ*0.52); ctx.stroke();
+    f.Mars=c; }
+
+  // JUPITER — iconic storm bands + Great Red Spot
+  { const c=mkCanvas(); const ctx=c.getContext('2d');
+    const bands=[
+      ['#c88b3a',0],['#e8c880',0.07],['#b87030',0.14],['#f0d890',0.21],
+      ['#c07828',0.28],['#e0c070',0.35],['#d49040',0.42],['#f8e0a0',0.48],
+      ['#c07828',0.55],['#e8d080',0.62],['#b06020',0.69],['#f0d890',0.76],
+      ['#c88b3a',0.83],['#e8c070',0.90],['#c07828',0.97],['#c88b3a',1.0]
+    ];
+    for(let i=0;i<bands.length-1;i++){
+      const g=ctx.createLinearGradient(0,bands[i][1]*SZ,0,bands[i+1][1]*SZ);
+      g.addColorStop(0,bands[i][0]); g.addColorStop(1,bands[i+1][0]);
+      ctx.fillStyle=g; ctx.fillRect(0,bands[i][1]*SZ,SZ,(bands[i+1][1]-bands[i][1])*SZ);
+    }
+    // turbulence lines
+    for(let i=0;i<60;i++){
+      const y=Math.random()*SZ;
+      ctx.strokeStyle=`rgba(${160+Math.random()*60|0},${100+Math.random()*60|0},${20+Math.random()*40|0},0.25)`;
+      ctx.lineWidth=1+Math.random()*3;
+      ctx.beginPath(); ctx.moveTo(0,y);
+      for(let x=0;x<=SZ;x+=30) ctx.lineTo(x,y+(Math.random()-0.5)*12);
+      ctx.stroke();
+    }
+    // GREAT RED SPOT
+    const grs=ctx.createRadialGradient(SZ*0.62,SZ*0.58,0,SZ*0.62,SZ*0.58,SZ*0.07);
+    grs.addColorStop(0,'rgba(180,50,30,0.95)'); grs.addColorStop(0.5,'rgba(200,80,50,0.75)'); grs.addColorStop(1,'rgba(190,70,40,0)');
+    ctx.save(); ctx.translate(SZ*0.62,SZ*0.58); ctx.scale(1.7,1); ctx.translate(-SZ*0.62,-SZ*0.58);
+    ctx.fillStyle=grs; ctx.beginPath(); ctx.arc(SZ*0.62,SZ*0.58,SZ*0.07,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    f.Jupiter=c; }
+
+  // SATURN — pale gold/cream bands
+  { const c=mkCanvas(); const ctx=c.getContext('2d');
+    const bands=[
+      ['#e8d898',0],['#f5eab8',0.08],['#d8c880',0.16],['#f0e0a8',0.24],
+      ['#c8b870',0.32],['#ecdca0',0.40],['#d4c488',0.48],
+      ['#f0e0a8',0.55],['#c8b870',0.63],['#e8d898',0.70],
+      ['#dac880',0.78],['#f0e0a8',0.86],['#e0d090',0.93],['#e8d898',1.0]
+    ];
+    for(let i=0;i<bands.length-1;i++){
+      const g=ctx.createLinearGradient(0,bands[i][1]*SZ,0,bands[i+1][1]*SZ);
+      g.addColorStop(0,bands[i][0]); g.addColorStop(1,bands[i+1][0]);
+      ctx.fillStyle=g; ctx.fillRect(0,bands[i][1]*SZ,SZ,(bands[i+1][1]-bands[i][1])*SZ);
+    }
+    for(let i=0;i<40;i++){
+      const y=Math.random()*SZ;
+      ctx.strokeStyle=`rgba(${180+Math.random()*40|0},${160+Math.random()*30|0},${80+Math.random()*40|0},0.18)`;
+      ctx.lineWidth=1+Math.random()*2;
+      ctx.beginPath(); ctx.moveTo(0,y);
+      for(let x=0;x<=SZ;x+=40) ctx.lineTo(x,y+(Math.random()-0.5)*6);
+      ctx.stroke();
+    }
+    f.Saturn=c; }
+
+  // URANUS — pale cyan ice giant
+  { const c=mkCanvas(); const ctx=c.getContext('2d');
+    const g=ctx.createLinearGradient(0,0,0,SZ);
+    g.addColorStop(0,'#a8e8f0'); g.addColorStop(0.3,'#72d4e0');
+    g.addColorStop(0.7,'#56c8d8'); g.addColorStop(1,'#3ab8cc');
+    ctx.fillStyle=g; ctx.fillRect(0,0,SZ,SZ);
+    // subtle band variations
+    for(let y=0;y<SZ;y++){
+      const v=Math.sin(y/SZ*Math.PI*8)*0.06;
+      ctx.fillStyle=`rgba(${100+v*60|0},${220+v*20|0},${230+v*10|0},0.15)`;
+      ctx.fillRect(0,y,SZ,1);
+    }
+    for(let i=0;i<150;i++){
+      ctx.fillStyle='rgba(160,235,245,0.12)';
+      ctx.beginPath(); ctx.ellipse(Math.random()*SZ,Math.random()*SZ,3+Math.random()*60,2+Math.random()*15,Math.random()*Math.PI,0,Math.PI*2); ctx.fill();
+    }
+    f.Uranus=c; }
+
+  // NEPTUNE — deep cobalt blue with storm
+  { const c=mkCanvas(); const ctx=c.getContext('2d');
+    const g=ctx.createLinearGradient(0,0,0,SZ);
+    g.addColorStop(0,'#1a3a8a'); g.addColorStop(0.3,'#1428c8');
+    g.addColorStop(0.7,'#0a1e98'); g.addColorStop(1,'#0818a8');
+    ctx.fillStyle=g; ctx.fillRect(0,0,SZ,SZ);
+    for(let y=0;y<SZ;y++){
+      const v=Math.sin(y/SZ*Math.PI*12)*0.08;
+      ctx.fillStyle=`rgba(${20+v*40|0},${40+v*40|0},${180+v*40|0},0.2)`;
+      ctx.fillRect(0,y,SZ,1);
+    }
+    // Great Dark Spot
+    const gds=ctx.createRadialGradient(SZ*0.4,SZ*0.42,0,SZ*0.4,SZ*0.42,SZ*0.08);
+    gds.addColorStop(0,'rgba(5,8,60,0.9)'); gds.addColorStop(0.6,'rgba(10,20,100,0.6)'); gds.addColorStop(1,'rgba(10,20,100,0)');
+    ctx.save(); ctx.translate(SZ*0.4,SZ*0.42); ctx.scale(1.6,1); ctx.translate(-SZ*0.4,-SZ*0.42);
+    ctx.fillStyle=gds; ctx.beginPath(); ctx.arc(SZ*0.4,SZ*0.42,SZ*0.08,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    // white wisps
+    for(let i=0;i<120;i++){
+      ctx.fillStyle='rgba(180,200,255,0.12)';
+      ctx.beginPath(); ctx.ellipse(Math.random()*SZ,Math.random()*SZ,3+Math.random()*50,1+Math.random()*8,Math.random()*Math.PI,0,Math.PI*2); ctx.fill();
+    }
+    f.Neptune=c; }
+
+  // MOON — grey, heavily cratered
+  { const c=mkCanvas(); const ctx=c.getContext('2d');
+    ctx.fillStyle='#888880'; ctx.fillRect(0,0,SZ,SZ);
+    // maria (dark patches)
+    const maria=[[0.35,0.35,0.18],[0.55,0.30,0.12],[0.62,0.48,0.08],[0.28,0.52,0.09],[0.5,0.55,0.10]];
+    maria.forEach(([mx,my,mr])=>{
+      const g=ctx.createRadialGradient(mx*SZ,my*SZ,0,mx*SZ,my*SZ,mr*SZ);
+      g.addColorStop(0,'rgba(60,58,55,0.75)'); g.addColorStop(1,'rgba(60,58,55,0)');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(mx*SZ,my*SZ,mr*SZ,0,Math.PI*2); ctx.fill();
+    });
+    for(let i=0;i<350;i++){
+      const x=Math.random()*SZ,y=Math.random()*SZ,r=1+Math.random()*18;
+      const d=(Math.random()-0.5)*30;
+      ctx.strokeStyle=`rgba(${110+d|0},${108+d|0},${100+d|0},0.65)`; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.stroke();
+      ctx.fillStyle=`rgba(${70+d|0},${68+d|0},${62+d|0},0.3)`;
+      ctx.beginPath(); ctx.arc(x,y,r*0.65,0,Math.PI*2); ctx.fill();
+    }
+    f.Moon=c; }
+
+  return f;
+}
+
+const FALLBACKS = procFallbacks();
+
+// ── TEXTURE LOADER WITH FALLBACK ──
+const tloader = new THREE.TextureLoader();
+tloader.crossOrigin = 'anonymous';
+
+// Returns a THREE.Texture — tries CDN URLs first, falls back to canvas
+function lt(key) {
+  const fallbackCanvas = FALLBACKS[key];
+  const urls = CDNS[key] || [];
+
+  // Start with fallback immediately so planet is never black
+  let tex;
+  if(fallbackCanvas){
+    tex = new THREE.CanvasTexture(fallbackCanvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+  } else {
+    tex = new THREE.Texture();
+  }
+
+  // Try each CDN URL; on success, swap texture image in-place
+  let tried = 0;
+  function tryNext(){
+    if(tried >= urls.length) return; // all failed, keep fallback
+    const url = urls[tried++];
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      tex.image = img;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.needsUpdate = true;
+    };
+    img.onerror = tryNext; // next URL
+    img.src = url;
+  }
+  tryNext();
+
+  return tex;
 }
 
 // ── SUN MESH ──
@@ -414,9 +726,9 @@ PCONF.forEach(cfg => {
   };
   const texKey = cfg.name;
   if(TEXMAP[texKey]) matParams.map = lt(texKey);
-  if(cfg.name==='Earth' && TEXMAP.EarthNormal){
-    matParams.normalMap = tloader.load(TEXMAP.EarthNormal);
-    matParams.normalScale = new THREE.Vector2(1.2,1.2);
+  if(cfg.name==='Earth'){
+    matParams.normalMap = lt('EarthNormal');
+    matParams.normalScale = new THREE.Vector2(0.8,0.8);
   }
 
   const mesh = new THREE.Mesh(
