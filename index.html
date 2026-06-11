@@ -251,64 +251,9 @@ canvas{display:block;position:fixed;inset:0;z-index:0}
   50%{height:13px}
 }
 
-/* ─── AUDIO UNLOCK OVERLAY ─── */
-#audio-unlock{
-  position:fixed;inset:0;z-index:8000;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  background:rgba(2,2,10,.82);backdrop-filter:blur(8px);
-  transition:opacity .6s ease;
-}
-#audio-unlock.gone{opacity:0;pointer-events:none}
-.au-card{
-  background:rgba(4,8,24,.95);
-  border:1px solid rgba(0,229,255,.25);
-  border-radius:20px;padding:36px 44px;
-  text-align:center;max-width:340px;
-  box-shadow:0 0 60px rgba(0,229,255,.1),0 20px 60px rgba(0,0,0,.7);
-}
-.au-icon{font-size:3.2rem;margin-bottom:14px;
-  filter:drop-shadow(0 0 16px rgba(255,215,0,.4))}
-.au-title{
-  font-family:'Orbitron',sans-serif;font-size:1rem;font-weight:700;
-  color:var(--gold);letter-spacing:2px;margin-bottom:8px;
-}
-.au-sub{font-size:.82rem;color:var(--muted);line-height:1.6;margin-bottom:24px}
-.au-yes{
-  display:inline-block;padding:12px 32px;
-  background:linear-gradient(135deg,#0a1a3a,#0a2a4a);
-  border:1px solid rgba(0,229,255,.35);
-  border-radius:30px;color:var(--teal);
-  font-family:'Orbitron',sans-serif;font-size:.7rem;
-  letter-spacing:2px;cursor:pointer;text-transform:uppercase;
-  transition:background .2s,box-shadow .2s;margin:0 6px;
-}
-.au-yes:hover{background:linear-gradient(135deg,#1a2a5a,#0a3a6a);box-shadow:0 0 20px rgba(0,229,255,.3)}
-.au-no{
-  display:inline-block;padding:12px 24px;
-  background:transparent;
-  border:1px solid rgba(255,255,255,.1);
-  border-radius:30px;color:rgba(255,255,255,.35);
-  font-family:'Orbitron',sans-serif;font-size:.7rem;
-  letter-spacing:2px;cursor:pointer;text-transform:uppercase;
-  transition:border-color .2s,color .2s;margin:0 6px;
-}
-.au-no:hover{border-color:rgba(255,255,255,.25);color:rgba(255,255,255,.55)}
 </style>
 </head>
 <body>
-
-<!-- Audio Unlock Prompt -->
-<div id="audio-unlock">
-  <div class="au-card">
-    <div class="au-icon">🔊</div>
-    <div class="au-title">Cosmic Soundscape</div>
-    <div class="au-sub">Enable ambient space sounds for a fully immersive journey through the Solar System?</div>
-    <div>
-      <button class="au-yes" onclick="unlockAudio(true)">🚀 Enable Sound</button>
-      <button class="au-no" onclick="unlockAudio(false)">No thanks</button>
-    </div>
-  </div>
-</div>
 
 <!-- Sound Toggle Button -->
 <button id="snd-btn" onclick="toggleSound()" title="Toggle cosmic sound">
@@ -1248,14 +1193,23 @@ function buildAudio(){
   updateSoundBtn(true);
 }
 
-function unlockAudio(enable){
-  const overlay = document.getElementById('audio-unlock');
-  overlay.classList.add('gone');
-  if(enable){
-    soundEnabled = true;
-    buildAudio();
-  }
+// ── AUTO-START AUDIO on first user gesture (browser autoplay policy) ──
+// Audio context can only be created/resumed after a user interaction.
+// We listen once for any click, keydown, or touchstart and silently start.
+let audioStarted = false;
+function tryStartAudio(){
+  if(audioStarted) return;
+  audioStarted = true;
+  soundEnabled = true;
+  buildAudio();
+  // Remove all listeners after first trigger
+  ['click','keydown','touchstart'].forEach(e=>
+    window.removeEventListener(e, tryStartAudio));
 }
+['click','keydown','touchstart'].forEach(e=>
+  window.addEventListener(e, tryStartAudio, {once:true, passive:true}));
+
+function unlockAudio(){} // no-op kept for safety
 
 function toggleSound(){
   if(!audioCtx && !soundEnabled){ buildAudio(); soundEnabled=true; return; }
