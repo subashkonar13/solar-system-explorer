@@ -177,25 +177,38 @@ canvas{display:block;position:fixed;inset:0;z-index:0}
   </div>
 </div>
 
-<!-- YouTube IFrame API -->
-<script src="https://www.youtube.com/iframe_api"></script>
-
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-  }
-}
+<!-- Three.js UMD — primary CDN with automatic fallback -->
+<script>
+  // Hard timeout: if Three.js doesn't load in 5s, show error on loader
+  window._threeLoadTimer = setTimeout(function(){
+    var l = document.getElementById('loader');
+    if(l && !l.classList.contains('out')){
+      var sub = l.querySelector('.l-sub');
+      var bar = l.querySelector('.l-bar');
+      var dots = l.querySelector('.l-dots');
+      if(sub) { sub.textContent = '⚠ Could not load 3D engine. Check your internet connection.'; sub.style.color='#FF6B35'; sub.style.letterSpacing='1px'; }
+      if(bar) bar.style.display='none';
+      if(dots) dots.style.display='none';
+    }
+  }, 7000);
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r160/three.min.js"
+  onerror="this.remove();var s=document.createElement('script');s.src='https://unpkg.com/three@0.160.0/build/three.min.js';document.head.appendChild(s);">
+</script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"
+  onerror="this.remove();var s=document.createElement('script');s.src='https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js';document.head.appendChild(s);">
 </script>
 
-<script type="module">
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+<script>
 
-// ═══════════════════════════════════════════════════
-//  PLANET DATA
-// ═══════════════════════════════════════════════════
+// Guard: if THREE failed to load, bail gracefully
+if(typeof THREE === 'undefined'){
+  console.error('Three.js failed to load.');
+  // loader timeout will already show error message
+} else {
+
+// OrbitControls lives on THREE namespace in UMD build
+const OrbitControls = THREE.OrbitControls;
 const DATA = {
   Sun:{emoji:'☀️',type:'Star',
     desc:`The Sun is our Solar System's blazing heart — a colossal ball of plasma held together by its own gravity. It accounts for 99.86% of the entire Solar System's mass and every second converts 600 million tonnes of hydrogen into helium.`,
@@ -919,6 +932,16 @@ function drawLabels(){
 // ═══════════════════════════════════════════════════
 const clock=new THREE.Clock();
 
+// ── HIDE LOADER on first rendered frame ──
+let _loaderHidden = false;
+function hideLoader(){
+  if(_loaderHidden) return;
+  _loaderHidden = true;
+  clearTimeout(window._threeLoadTimer); // cancel error timeout
+  const l = document.getElementById('loader');
+  if(l) l.classList.add('out');
+}
+
 renderer.setAnimationLoop(()=>{
   const dt=clock.getDelta();
 
@@ -957,6 +980,9 @@ renderer.setAnimationLoop(()=>{
   ctrl.update();
   renderer.render(scene,cam);
   drawLabels();
+
+  // Hide loader on the very first completed frame
+  hideLoader();
 });
 
 // ── RESIZE ──
@@ -967,8 +993,7 @@ window.addEventListener('resize',()=>{
   resizeLabels();
 });
 
-// ── HIDE LOADER ──
-setTimeout(()=>document.getElementById('loader').classList.add('out'),2600);
+} // end if(typeof THREE !== 'undefined')
 
 // ═══════════════════════════════════════════════════
 //  🎵 YOUTUBE AUDIO  (IFrame API)
@@ -1041,5 +1066,8 @@ function tryStartAudio(){
   window.addEventListener(e, tryStartAudio, {once:true, passive:true}));
 
 </script>
+
+<!-- YouTube IFrame API (loaded last so it doesn't block Three.js) -->
+<script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
