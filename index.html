@@ -177,34 +177,58 @@ canvas{display:block;position:fixed;inset:0;z-index:0}
   </div>
 </div>
 
-<!-- Three.js UMD — primary CDN with automatic fallback -->
+<!-- Three.js loader: sequential, reliable, with graceful error -->
 <script>
-  // Hard timeout: if Three.js doesn't load in 5s, show error on loader
-  window._threeLoadTimer = setTimeout(function(){
-    var l = document.getElementById('loader');
-    if(l && !l.classList.contains('out')){
-      var sub = l.querySelector('.l-sub');
-      var bar = l.querySelector('.l-bar');
-      var dots = l.querySelector('.l-dots');
-      if(sub) { sub.textContent = '⚠ Could not load 3D engine. Check your internet connection.'; sub.style.color='#FF6B35'; sub.style.letterSpacing='1px'; }
-      if(bar) bar.style.display='none';
-      if(dots) dots.style.display='none';
-    }
-  }, 7000);
-</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r160/three.min.js"
-  onerror="this.remove();var s=document.createElement('script');s.src='https://unpkg.com/three@0.160.0/build/three.min.js';document.head.appendChild(s);">
-</script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"
-  onerror="this.remove();var s=document.createElement('script');s.src='https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js';document.head.appendChild(s);">
+(function(){
+  var TIMEOUT = 12000;
+  var THREE_URLS = [
+    'https://unpkg.com/three@0.128.0/build/three.min.js',
+    'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js'
+  ];
+  var ORBIT_URLS = [
+    'https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js',
+    'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js'
+  ];
+
+  function showError(){
+    var l=document.getElementById('loader');
+    if(!l||l.classList.contains('out')) return;
+    var sub=l.querySelector('.l-sub');
+    var bar=l.querySelector('.l-bar');
+    var dots=l.querySelector('.l-dots');
+    if(sub){sub.textContent='⚠ Could not load 3D engine. Check your internet connection & reload.';sub.style.color='#FF6B35';sub.style.letterSpacing='0px';sub.style.fontSize='0.8rem';}
+    if(bar) bar.style.display='none';
+    if(dots) dots.style.display='none';
+  }
+
+  window._threeLoadTimer = setTimeout(showError, TIMEOUT);
+
+  function loadScript(urls, idx, onSuccess, onFail){
+    if(idx >= urls.length){ onFail(); return; }
+    var s = document.createElement('script');
+    s.src = urls[idx];
+    s.onload  = onSuccess;
+    s.onerror = function(){ loadScript(urls, idx+1, onSuccess, onFail); };
+    document.head.appendChild(s);
+  }
+
+  // Step 1: load Three.js
+  loadScript(THREE_URLS, 0, function(){
+    // Step 2: load OrbitControls (depends on THREE being present)
+    loadScript(ORBIT_URLS, 0, function(){
+      // Both loaded — fire custom event so main script can start
+      document.dispatchEvent(new Event('threejs-ready'));
+    }, showError);
+  }, showError);
+})();
 </script>
 
 <script>
+document.addEventListener('threejs-ready', function(){
 
 // Guard: if THREE failed to load, bail gracefully
 if(typeof THREE === 'undefined'){
   console.error('Three.js failed to load.');
-  // loader timeout will already show error message
 } else {
 
 // OrbitControls lives on THREE namespace in UMD build
@@ -994,6 +1018,8 @@ window.addEventListener('resize',()=>{
 });
 
 } // end if(typeof THREE !== 'undefined')
+
+}); // end threejs-ready
 
 // ═══════════════════════════════════════════════════
 //  🎵 YOUTUBE AUDIO  (IFrame API)
