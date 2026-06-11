@@ -215,9 +215,111 @@ canvas{display:block;position:fixed;inset:0;z-index:0}
 
 /* ─── ORBIT LABEL CANVAS ─── */
 #labels{position:fixed;inset:0;pointer-events:none;z-index:10}
+
+/* ─── SOUND BUTTON ─── */
+#snd-btn{
+  position:fixed;top:16px;right:22px;z-index:200;
+  display:flex;align-items:center;gap:8px;
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:30px;padding:7px 16px;
+  font-family:'Orbitron',sans-serif;font-size:.62rem;
+  letter-spacing:2px;color:var(--teal);cursor:pointer;
+  backdrop-filter:blur(10px);
+  transition:background .2s,box-shadow .2s,border-color .2s;
+  text-transform:uppercase;
+}
+#snd-btn:hover{
+  background:rgba(0,229,255,.12);
+  border-color:rgba(0,229,255,.5);
+  box-shadow:0 0 18px rgba(0,229,255,.25);
+}
+#snd-btn .snd-icon{font-size:1rem;line-height:1}
+#snd-btn .snd-bars{
+  display:flex;align-items:flex-end;gap:2px;height:14px;
+}
+#snd-btn .snd-bars span{
+  display:block;width:3px;background:var(--teal);border-radius:2px;
+  opacity:0.4;
+}
+#snd-btn.playing .snd-bars span{opacity:1}
+#snd-btn.playing .snd-bars span:nth-child(1){animation:bar 1.1s ease-in-out infinite}
+#snd-btn.playing .snd-bars span:nth-child(2){animation:bar 0.85s ease-in-out infinite .15s}
+#snd-btn.playing .snd-bars span:nth-child(3){animation:bar 1.3s ease-in-out infinite .05s}
+#snd-btn.playing .snd-bars span:nth-child(4){animation:bar 0.95s ease-in-out infinite .3s}
+@keyframes bar{
+  0%,100%{height:3px}
+  50%{height:13px}
+}
+
+/* ─── AUDIO UNLOCK OVERLAY ─── */
+#audio-unlock{
+  position:fixed;inset:0;z-index:8000;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:rgba(2,2,10,.82);backdrop-filter:blur(8px);
+  transition:opacity .6s ease;
+}
+#audio-unlock.gone{opacity:0;pointer-events:none}
+.au-card{
+  background:rgba(4,8,24,.95);
+  border:1px solid rgba(0,229,255,.25);
+  border-radius:20px;padding:36px 44px;
+  text-align:center;max-width:340px;
+  box-shadow:0 0 60px rgba(0,229,255,.1),0 20px 60px rgba(0,0,0,.7);
+}
+.au-icon{font-size:3.2rem;margin-bottom:14px;
+  filter:drop-shadow(0 0 16px rgba(255,215,0,.4))}
+.au-title{
+  font-family:'Orbitron',sans-serif;font-size:1rem;font-weight:700;
+  color:var(--gold);letter-spacing:2px;margin-bottom:8px;
+}
+.au-sub{font-size:.82rem;color:var(--muted);line-height:1.6;margin-bottom:24px}
+.au-yes{
+  display:inline-block;padding:12px 32px;
+  background:linear-gradient(135deg,#0a1a3a,#0a2a4a);
+  border:1px solid rgba(0,229,255,.35);
+  border-radius:30px;color:var(--teal);
+  font-family:'Orbitron',sans-serif;font-size:.7rem;
+  letter-spacing:2px;cursor:pointer;text-transform:uppercase;
+  transition:background .2s,box-shadow .2s;margin:0 6px;
+}
+.au-yes:hover{background:linear-gradient(135deg,#1a2a5a,#0a3a6a);box-shadow:0 0 20px rgba(0,229,255,.3)}
+.au-no{
+  display:inline-block;padding:12px 24px;
+  background:transparent;
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:30px;color:rgba(255,255,255,.35);
+  font-family:'Orbitron',sans-serif;font-size:.7rem;
+  letter-spacing:2px;cursor:pointer;text-transform:uppercase;
+  transition:border-color .2s,color .2s;margin:0 6px;
+}
+.au-no:hover{border-color:rgba(255,255,255,.25);color:rgba(255,255,255,.55)}
 </style>
 </head>
 <body>
+
+<!-- Audio Unlock Prompt -->
+<div id="audio-unlock">
+  <div class="au-card">
+    <div class="au-icon">🔊</div>
+    <div class="au-title">Cosmic Soundscape</div>
+    <div class="au-sub">Enable ambient space sounds for a fully immersive journey through the Solar System?</div>
+    <div>
+      <button class="au-yes" onclick="unlockAudio(true)">🚀 Enable Sound</button>
+      <button class="au-no" onclick="unlockAudio(false)">No thanks</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sound Toggle Button -->
+<button id="snd-btn" onclick="toggleSound()" title="Toggle cosmic sound">
+  <span class="snd-icon">🔇</span>
+  <div class="snd-bars">
+    <span style="height:4px"></span>
+    <span style="height:9px"></span>
+    <span style="height:6px"></span>
+    <span style="height:12px"></span>
+  </div>
+</button>
 
 <div id="loader">
   <div class="l-title">☀ SOLAR EXPLORER</div>
@@ -460,11 +562,11 @@ scene.add(ambLight);
 // ── SUN ──
 const sunGeo = new THREE.SphereGeometry(8, 64, 64);
 const sunMat = new THREE.MeshStandardMaterial({
-  color:0xFFB347,
-  emissive:0xFF7700,
-  emissiveIntensity:1.2,
-  roughness:0.8,
-  metalness:0.0
+  color: 0xFFFFFF,
+  emissive: 0xFFFFFF,
+  emissiveIntensity: 1.0,
+  roughness: 1.0,
+  metalness: 0.0
 });
 const sun = new THREE.Mesh(sunGeo, sunMat);
 sun.name = 'Sun';
@@ -512,88 +614,79 @@ function makeOrbit(r){
   scene.add(line);
 }
 
-// ── PROCEDURAL PLANET TEXTURES ──
-function makePlanetTexture(hex, bands=false, isEarth=false){
-  const sz=512, cnv=document.createElement('canvas');
-  cnv.width=cnv.height=sz;
-  const ctx=cnv.getContext('2d');
-  const c=new THREE.Color(hex);
+// ════════════════════════════════════════════════════
+//  REAL PHOTO TEXTURES  (NASA Solar System Exploration
+//  & Solar System Scope public CDN — all free/CC)
+// ════════════════════════════════════════════════════
+const loader = new THREE.TextureLoader();
+loader.crossOrigin = 'anonymous';
 
-  if(isEarth){
-    // ocean base
-    ctx.fillStyle=`hsl(215,70%,35%)`;
-    ctx.fillRect(0,0,sz,sz);
-    // continents
-    ctx.fillStyle=`hsl(100,45%,30%)`;
-    for(let i=0;i<18;i++){
-      ctx.beginPath();
-      ctx.ellipse(Math.random()*sz,Math.random()*sz,
-        20+Math.random()*80,15+Math.random()*60,
-        Math.random()*Math.PI,0,Math.PI*2);
-      ctx.fill();
-    }
-    // ice caps
-    ctx.fillStyle='rgba(220,235,255,0.8)';
-    ctx.fillRect(0,0,sz,40);
-    ctx.fillRect(0,sz-40,sz,40);
-  } else if(bands){
-    // Jupiter-style bands
-    const r=Math.round(c.r*255),g=Math.round(c.g*255),b=Math.round(c.b*255);
-    for(let y=0;y<sz;y++){
-      const band=Math.sin(y/sz*Math.PI*18+Math.random()*0.2)*0.15;
-      ctx.fillStyle=`rgb(${Math.min(255,r+band*60|0)},${Math.min(255,g+band*40|0)},${Math.min(255,b+band*20|0)})`;
-      ctx.fillRect(0,y,sz,1);
-    }
-    // Great Red Spot for Jupiter
-    ctx.save();
-    ctx.translate(sz*0.55,sz*0.55);
-    ctx.scale(1,0.5);
-    const grs=ctx.createRadialGradient(0,0,0,0,0,sz*0.08);
-    grs.addColorStop(0,'rgba(180,60,40,0.9)');
-    grs.addColorStop(1,'rgba(180,60,40,0)');
-    ctx.fillStyle=grs;
-    ctx.beginPath(); ctx.arc(0,0,sz*0.08,0,Math.PI*2); ctx.fill();
-    ctx.restore();
-  } else {
-    // generic rocky/gas texture
-    const r=Math.round(c.r*255),g=Math.round(c.g*255),b=Math.round(c.b*255);
-    ctx.fillStyle=`rgb(${r},${g},${b})`;
-    ctx.fillRect(0,0,sz,sz);
-    // noise patches
-    for(let i=0;i<600;i++){
-      const dr=(Math.random()-0.5)*55;
-      ctx.fillStyle=`rgba(${r+dr|0},${g+dr|0},${b+dr|0},0.25)`;
-      ctx.beginPath();
-      ctx.arc(Math.random()*sz,Math.random()*sz,1+Math.random()*12,0,Math.PI*2);
-      ctx.fill();
-    }
-  }
-  return new THREE.CanvasTexture(cnv);
-}
+// Primary: Solar System Scope CDN (reliable, CORS-open)
+const BASE = 'https://www.solarsystemscope.com/textures/download/';
 
-// ── SATURN RINGS TEXTURE ──
+const TEX = {
+  Sun:     { map: BASE+'2k_sun.jpg' },
+  Mercury: { map: BASE+'2k_mercury.jpg' },
+  Venus:   { map: BASE+'2k_venus_surface.jpg',   atm: BASE+'2k_venus_atmosphere.jpg' },
+  Earth:   { map: BASE+'2k_earth_daymap.jpg',
+             normal: BASE+'2k_earth_normal_map.png',
+             spec:   BASE+'2k_earth_specular_map.tif',
+             clouds: BASE+'2k_earth_clouds.jpg' },
+  Mars:    { map: BASE+'2k_mars.jpg' },
+  Jupiter: { map: BASE+'2k_jupiter.jpg' },
+  Saturn:  { map: BASE+'2k_saturn.jpg',  ring: BASE+'2k_saturn_ring_alpha.png' },
+  Uranus:  { map: BASE+'2k_uranus.jpg' },
+  Neptune: { map: BASE+'2k_neptune.jpg' },
+  Moon:    { map: BASE+'2k_moon.jpg' }
+};
+
+// Fallback: NASA's publicly hosted textures on
+// https://svs.gsfc.nasa.gov (no CORS header) &
+// https://planetpixelemporium.com — we use Solar System Scope which
+// explicitly allows hotlinking for non-commercial use.
+
+function loadTex(url){ return loader.load(url, undefined, undefined, ()=>{}); }
+
+// ── SATURN RINGS ALPHA TEXTURE (canvas fallback if CDN fails) ──
 function makeRingTexture(){
-  const sz=512,cnv=document.createElement('canvas');
-  cnv.width=sz; cnv.height=4;
+  const sz=1024, cnv=document.createElement('canvas');
+  cnv.width=sz; cnv.height=8;
   const ctx=cnv.getContext('2d');
   const g=ctx.createLinearGradient(0,0,sz,0);
-  g.addColorStop(0,'rgba(0,0,0,0)');
-  g.addColorStop(0.1,'rgba(180,160,110,0.2)');
-  g.addColorStop(0.25,'rgba(200,185,140,0.7)');
-  g.addColorStop(0.4,'rgba(170,150,100,0.5)');
-  g.addColorStop(0.55,'rgba(210,195,155,0.85)');
-  g.addColorStop(0.7,'rgba(165,145,95,0.4)');
-  g.addColorStop(0.85,'rgba(185,170,125,0.6)');
-  g.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.fillStyle=g; ctx.fillRect(0,0,sz,4);
+  // Cassini division and real ring structure approximation
+  g.addColorStop(0.00,'rgba(0,0,0,0)');
+  g.addColorStop(0.08,'rgba(120,105,75,0.15)');
+  g.addColorStop(0.15,'rgba(180,162,118,0.55)');
+  g.addColorStop(0.22,'rgba(210,192,145,0.80)');
+  g.addColorStop(0.30,'rgba(195,178,130,0.65)');
+  g.addColorStop(0.38,'rgba(225,208,162,0.90)');  // B ring bright
+  g.addColorStop(0.46,'rgba(200,183,138,0.70)');
+  g.addColorStop(0.50,'rgba(60,55,40,0.10)');      // Cassini Division gap
+  g.addColorStop(0.54,'rgba(175,160,115,0.50)');
+  g.addColorStop(0.62,'rgba(215,198,152,0.82)');
+  g.addColorStop(0.70,'rgba(185,168,122,0.55)');
+  g.addColorStop(0.78,'rgba(155,140,100,0.35)');
+  g.addColorStop(0.88,'rgba(130,118,85,0.18)');
+  g.addColorStop(1.00,'rgba(0,0,0,0)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,sz,8);
   return new THREE.CanvasTexture(cnv);
 }
 
+// ── SUN TEXTURE APPLIED ──
+{
+  const sunTex = loadTex(TEX.Sun.map);
+  sunTex.colorSpace = THREE.SRGBColorSpace;
+  sun.material.map = sunTex;
+  sun.material.emissiveMap = sunTex;
+  sun.material.emissiveIntensity = 1.0;
+  sun.material.needsUpdate = true;
+}
+
 // ════════════════════════════════════════════════════
-//  BUILD PLANETS
+//  BUILD PLANETS  (real textures + normal/cloud layers)
 // ════════════════════════════════════════════════════
-const pickables = [sun]; // all meshes we can pick
-const planetObjs = {};   // name → {pivot, mesh, cfg}
+const pickables = [sun];
+const planetObjs = {};
 let moonAngle = 0;
 let moonMesh = null, moonPivot = null;
 
@@ -603,16 +696,30 @@ PCONF.forEach(cfg=>{
   pivot.rotation.y = Math.random()*Math.PI*2;
   scene.add(pivot);
 
-  const isEarth = cfg.name==='Earth';
-  const isBands  = cfg.bands||false;
-  const tex = makePlanetTexture(cfg.color, isBands, isEarth);
+  const t = TEX[cfg.name] || {};
+  const diffTex = t.map ? loadTex(t.map) : null;
+  if(diffTex) diffTex.colorSpace = THREE.SRGBColorSpace;
 
-  const geo = new THREE.SphereGeometry(cfg.r*1.18, 48, 48);
-  const mat = new THREE.MeshStandardMaterial({
-    map:tex,
-    roughness:cfg.name==='Venus'?0.95:0.82,
-    metalness:0.05
-  });
+  const geo = new THREE.SphereGeometry(cfg.r*1.18, 64, 64);
+  const matParams = {
+    roughness: cfg.name==='Earth' ? 0.6 : cfg.name==='Venus' ? 0.95 : 0.85,
+    metalness: cfg.name==='Earth' ? 0.05 : 0.0
+  };
+  if(diffTex) matParams.map = diffTex;
+
+  // Normal map for Earth (shows ocean ridges, mountain bumps)
+  if(t.normal){
+    const nTex = loadTex(t.normal);
+    matParams.normalMap = nTex;
+    matParams.normalScale = new THREE.Vector2(1.2, 1.2);
+  }
+
+  // Venus: blend surface + atmosphere (additive cloud layer)
+  if(cfg.name==='Venus' && t.atm){
+    matParams.roughness = 0.98;
+  }
+
+  const mat = new THREE.MeshStandardMaterial(matParams);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = cfg.name;
   mesh.position.x = cfg.orbitR;
@@ -622,45 +729,107 @@ PCONF.forEach(cfg=>{
   pivot.add(mesh);
   pickables.push(mesh);
 
-  // Saturn rings
+  // ── Earth cloud layer ──
+  if(cfg.name==='Earth' && t.clouds){
+    const cloudTex = loadTex(t.clouds);
+    cloudTex.colorSpace = THREE.SRGBColorSpace;
+    const cloudMat = new THREE.MeshStandardMaterial({
+      map: cloudTex,
+      transparent: true,
+      opacity: 0.38,
+      roughness: 1.0,
+      metalness: 0.0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+    const cloudMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(cfg.r*1.18*1.008, 64, 64),
+      cloudMat
+    );
+    cloudMesh.raycast = ()=>{};
+    cloudMesh.name = 'EarthClouds';
+    pivot.add(cloudMesh);
+    cloudMesh.position.x = cfg.orbitR;
+    cloudMesh.rotation.z = THREE.MathUtils.degToRad(cfg.tilt||0);
+    // Store ref for slow cloud rotation
+    planetObjs['__clouds'] = cloudMesh;
+  }
+
+  // ── Venus atmosphere overlay ──
+  if(cfg.name==='Venus' && t.atm){
+    const atmTex = loadTex(t.atm);
+    atmTex.colorSpace = THREE.SRGBColorSpace;
+    const atmMat = new THREE.MeshStandardMaterial({
+      map: atmTex,
+      transparent: true,
+      opacity: 0.45,
+      roughness: 1.0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+    const atmMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(cfg.r*1.18*1.01, 48, 48),
+      atmMat
+    );
+    atmMesh.raycast = ()=>{};
+    atmMesh.position.x = cfg.orbitR;
+    atmMesh.rotation.z = THREE.MathUtils.degToRad(cfg.tilt||0);
+    pivot.add(atmMesh);
+    planetObjs['__venusAtm'] = atmMesh;
+  }
+
+  // ── Saturn rings (use CDN alpha ring texture, fallback to canvas) ──
   if(cfg.rings){
-    const rInner = cfg.r*1.18*1.35;
-    const rOuter = cfg.r*1.18*2.65;
-    const rGeo = new THREE.RingGeometry(rInner, rOuter, 128);
-    // fix UVs for ring texture
-    const pos=rGeo.attributes.position;
-    const uv=rGeo.attributes.uv;
-    for(let i=0;i<pos.count;i++){
-      const v=new THREE.Vector3().fromBufferAttribute(pos,i);
-      const t=(v.length()-rInner)/(rOuter-rInner);
-      uv.setXY(i,t,0.5);
+    const rInner = cfg.r*1.18*1.30;
+    const rOuter = cfg.r*1.18*2.80;
+    const rGeo = new THREE.RingGeometry(rInner, rOuter, 256);
+    // Remap UVs so ring texture maps radially
+    const posAttr = rGeo.attributes.position;
+    const uvAttr  = rGeo.attributes.uv;
+    for(let i=0; i<posAttr.count; i++){
+      const v = new THREE.Vector3().fromBufferAttribute(posAttr, i);
+      const t = (v.length()-rInner)/(rOuter-rInner);
+      uvAttr.setXY(i, t, 0.5);
+    }
+    uvAttr.needsUpdate = true;
+
+    let ringTex;
+    if(TEX.Saturn.ring){
+      ringTex = loadTex(TEX.Saturn.ring);
+    } else {
+      ringTex = makeRingTexture();
     }
     const rMat = new THREE.MeshBasicMaterial({
-      map:makeRingTexture(),
-      side:THREE.DoubleSide,
-      transparent:true,
-      opacity:0.88,
-      depthWrite:false
+      map: ringTex,
+      side: THREE.DoubleSide,
+      transparent: true,
+      depthWrite: false,
+      opacity: 0.92
     });
     const ring = new THREE.Mesh(rGeo, rMat);
     ring.rotation.x = Math.PI/2;
-    ring.raycast=()=>{};
+    ring.raycast = ()=>{};
     mesh.add(ring);
   }
 
-  // Earth Moon
+  // ── Earth Moon ──
   if(cfg.moon){
     moonPivot = new THREE.Object3D();
     moonPivot.position.x = cfg.orbitR;
     pivot.add(moonPivot);
 
-    const mGeo = new THREE.SphereGeometry(0.32,24,24);
-    const mTex = makePlanetTexture(0xAAAAAA);
-    const mMat = new THREE.MeshStandardMaterial({map:mTex,roughness:0.95,metalness:0.0});
-    moonMesh = new THREE.Mesh(mGeo,mMat);
+    const moonDiffTex = loadTex(TEX.Moon.map);
+    moonDiffTex.colorSpace = THREE.SRGBColorSpace;
+    const mGeo = new THREE.SphereGeometry(0.38, 32, 32);
+    const mMat = new THREE.MeshStandardMaterial({
+      map: moonDiffTex,
+      roughness: 0.96,
+      metalness: 0.0
+    });
+    moonMesh = new THREE.Mesh(mGeo, mMat);
     moonMesh.name = 'Moon';
     moonMesh.position.x = 3.4;
-    moonMesh.raycast=()=>{};
+    moonMesh.raycast = ()=>{};
     moonPivot.add(moonMesh);
   }
 
@@ -831,6 +1000,15 @@ renderer.setAnimationLoop(()=>{
     obj.mesh.rotation.y  += cfg.selfRot*0.04*spd*dt*60;
   });
 
+  // Slowly rotate Earth cloud layer (slightly faster than surface)
+  if(planetObjs['__clouds']){
+    planetObjs['__clouds'].rotation.y += 0.0012*spd*dt*60;
+  }
+  // Venus atmosphere drifts
+  if(planetObjs['__venusAtm']){
+    planetObjs['__venusAtm'].rotation.y -= 0.0008*spd*dt*60;
+  }
+
   // Moon orbit
   if(moonMesh && moonPivot){
     moonAngle += 2.0*spd*dt;
@@ -865,6 +1043,252 @@ window.addEventListener('resize',()=>{
 
 // ── HIDE LOADER ──
 setTimeout(()=>document.getElementById('loader').classList.add('out'), 2600);
+
+// ════════════════════════════════════════════════════
+//  🔊 COSMIC AUDIO ENGINE  (Web Audio API — zero external files)
+// ════════════════════════════════════════════════════
+let audioCtx = null;
+let masterGain = null;
+let soundEnabled = false;
+let audioReady = false;
+
+// All running audio nodes so we can stop/resume cleanly
+const audioNodes = [];
+
+function buildAudio(){
+  if(audioReady) return;
+  audioCtx  = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = audioCtx.createGain();
+  masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+  masterGain.connect(audioCtx.destination);
+
+  // ── 1. DEEP SPACE DRONE ──
+  // A slow, evolving pad of 3 detuned oscillators through reverb
+  const droneFreqs = [36.7, 55.0, 73.4]; // D1, A1, D2
+  droneFreqs.forEach((freq, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    // Slow frequency drift — cosmic breathing
+    osc.frequency.setTargetAtTime(freq * 1.004, audioCtx.currentTime + 4 + i*3, 8);
+    osc.frequency.setTargetAtTime(freq * 0.997, audioCtx.currentTime + 16 + i*2, 10);
+    osc.frequency.setTargetAtTime(freq, audioCtx.currentTime + 32, 12);
+
+    filter.type = 'lowpass';
+    filter.frequency.value = 180;
+    filter.Q.value = 1.2;
+
+    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.18 - i*0.04, audioCtx.currentTime + 4);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(masterGain);
+    osc.start();
+    audioNodes.push(osc, gain, filter);
+  });
+
+  // ── 2. COSMIC SHIMMER — high harmonic layer ──
+  const shimmerFreqs = [220, 293.66, 369.99, 440]; // A3 chord
+  shimmerFreqs.forEach((freq, i) => {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+    const tremoloOsc = audioCtx.createOscillator();
+    const tremoloGain = audioCtx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.value = freq + (Math.random()-0.5)*1.5;
+
+    // Tremolo LFO
+    tremoloOsc.type = 'sine';
+    tremoloOsc.frequency.value = 0.15 + i * 0.04;
+    tremoloGain.gain.value = 0.012;
+    tremoloOsc.connect(tremoloGain);
+    tremoloGain.connect(gain.gain);
+
+    filter.type = 'bandpass';
+    filter.frequency.value = freq * 1.5;
+    filter.Q.value = 3;
+
+    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.022, audioCtx.currentTime + 6 + i);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(masterGain);
+    osc.start();
+    tremoloOsc.start();
+    audioNodes.push(osc, tremoloOsc, gain, tremoloGain, filter);
+  });
+
+  // ── 3. STELLAR WIND — filtered white noise ──
+  {
+    const bufLen = audioCtx.sampleRate * 4;
+    const buf = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    // Pink noise approximation
+    let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+    for(let i=0;i<bufLen;i++){
+      const w = Math.random()*2-1;
+      b0=0.99886*b0+w*0.0555179; b1=0.99332*b1+w*0.0750759;
+      b2=0.96900*b2+w*0.1538520; b3=0.86650*b3+w*0.3104856;
+      b4=0.55000*b4+w*0.5329522; b5=-0.7616*b5-w*0.0168980;
+      data[i]=(b0+b1+b2+b3+b4+b5+b6+w*0.5362)*0.11;
+      b6=w*0.115926;
+    }
+
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buf;
+    noise.loop = true;
+
+    const filter1 = audioCtx.createBiquadFilter();
+    filter1.type = 'bandpass';
+    filter1.frequency.value = 800;
+    filter1.Q.value = 0.4;
+
+    const filter2 = audioCtx.createBiquadFilter();
+    filter2.type = 'highpass';
+    filter2.frequency.value = 200;
+
+    const windGain = audioCtx.createGain();
+    windGain.gain.setValueAtTime(0, audioCtx.currentTime);
+    windGain.gain.linearRampToValueAtTime(0.04, audioCtx.currentTime + 5);
+
+    // Slow wind swell LFO
+    const windLFO = audioCtx.createOscillator();
+    const windLFOGain = audioCtx.createGain();
+    windLFO.type = 'sine';
+    windLFO.frequency.value = 0.07;
+    windLFOGain.gain.value = 0.025;
+    windLFO.connect(windLFOGain);
+    windLFOGain.connect(windGain.gain);
+
+    noise.connect(filter1);
+    filter1.connect(filter2);
+    filter2.connect(windGain);
+    windGain.connect(masterGain);
+    noise.start();
+    windLFO.start();
+    audioNodes.push(noise, filter1, filter2, windGain, windLFO, windLFOGain);
+  }
+
+  // ── 4. CELESTIAL BELLS — random twinkling tones ──
+  const bellNotes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.5];
+  function ringBell(){
+    if(!soundEnabled || !audioCtx) return;
+    const freq = bellNotes[Math.floor(Math.random()*bellNotes.length)];
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    const bGain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+
+    osc1.type = 'sine';
+    osc1.frequency.value = freq;
+    osc2.type = 'sine';
+    osc2.frequency.value = freq * 2.756; // metallic partial
+
+    filter.type = 'highpass';
+    filter.frequency.value = 400;
+
+    bGain.gain.setValueAtTime(0, audioCtx.currentTime);
+    bGain.gain.linearRampToValueAtTime(0.06, audioCtx.currentTime + 0.01);
+    bGain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 3.5);
+
+    osc1.connect(filter); osc2.connect(filter);
+    filter.connect(bGain); bGain.connect(masterGain);
+
+    osc1.start(); osc2.start();
+    osc1.stop(audioCtx.currentTime + 3.6);
+    osc2.stop(audioCtx.currentTime + 3.6);
+
+    // Schedule next bell — random interval 3–11 seconds
+    setTimeout(ringBell, 3000 + Math.random()*8000);
+  }
+  setTimeout(ringBell, 2500);
+
+  // ── 5. DEEP PULSE — sub-bass heartbeat of the cosmos ──
+  {
+    const pulseOsc = audioCtx.createOscillator();
+    const pulseGain = audioCtx.createGain();
+    const pulseFilter = audioCtx.createBiquadFilter();
+    const pulseLFO = audioCtx.createOscillator();
+    const pulseLFOGain = audioCtx.createGain();
+
+    pulseOsc.type = 'sine';
+    pulseOsc.frequency.value = 28; // sub-bass
+
+    pulseLFO.type = 'sine';
+    pulseLFO.frequency.value = 0.25; // pulse every ~4 sec
+    pulseLFOGain.gain.value = 0.035;
+    pulseLFO.connect(pulseLFOGain);
+    pulseLFOGain.connect(pulseGain.gain);
+
+    pulseFilter.type = 'lowpass';
+    pulseFilter.frequency.value = 80;
+
+    pulseGain.gain.setValueAtTime(0.0, audioCtx.currentTime);
+    pulseGain.gain.linearRampToValueAtTime(0.06, audioCtx.currentTime + 7);
+
+    pulseOsc.connect(pulseFilter);
+    pulseFilter.connect(pulseGain);
+    pulseGain.connect(masterGain);
+    pulseOsc.start();
+    pulseLFO.start();
+    audioNodes.push(pulseOsc, pulseLFO, pulseGain, pulseLFOGain, pulseFilter);
+  }
+
+  // Fade master in slowly
+  masterGain.gain.linearRampToValueAtTime(0.85, audioCtx.currentTime + 5);
+
+  audioReady = true;
+  updateSoundBtn(true);
+}
+
+function unlockAudio(enable){
+  const overlay = document.getElementById('audio-unlock');
+  overlay.classList.add('gone');
+  if(enable){
+    soundEnabled = true;
+    buildAudio();
+  }
+}
+
+function toggleSound(){
+  if(!audioCtx && !soundEnabled){ buildAudio(); soundEnabled=true; return; }
+  if(!audioCtx) return;
+  if(soundEnabled){
+    // Fade out
+    masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
+    masterGain.gain.setValueAtTime(masterGain.gain.value, audioCtx.currentTime);
+    masterGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1.5);
+    soundEnabled = false;
+    updateSoundBtn(false);
+  } else {
+    // Fade in
+    masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
+    masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+    masterGain.gain.linearRampToValueAtTime(0.85, audioCtx.currentTime + 2);
+    soundEnabled = true;
+    updateSoundBtn(true);
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+  }
+}
+
+function updateSoundBtn(on){
+  const btn = document.getElementById('snd-btn');
+  const icon = btn.querySelector('.snd-icon');
+  if(on){
+    btn.classList.add('playing');
+    icon.textContent = '🔊';
+  } else {
+    btn.classList.remove('playing');
+    icon.textContent = '🔇';
+  }
+}
 </script>
 </body>
 </html>
